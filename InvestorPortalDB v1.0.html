@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="et">
+<head>
+  <meta charset="utf-8" />
+  <title>Investor Portal Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <style>
+    :root{
+      /* Modena bränd */
+      --white:#FFFFFF;
+      --modena-light:#DEF4F2;
+      --modena-cyan:#A8FEEE;
+      --modena-dark:#012B32;
+      --modena-petrol:#005F6B;
+
+      /* UI */
+      --bg: var(--modena-dark);
+      --card:#0E1C22;
+      --card-2:#0F2229;
+      --text:#ECF5F3;
+      --muted:#B9C8C6;
+      --grid-gap:16px;
+      --radius:16px;
+      --shadow:0 6px 22px rgba(0,0,0,.25);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:
+        radial-gradient(1200px 800px at 10% -10%, rgba(168,254,238,.25), transparent 60%),
+        radial-gradient(1000px 700px at 110% 0%, rgba(223,244,242,.15), transparent 60%),
+        linear-gradient(180deg, #001b22 0%, var(--bg) 55%, #00161c 100%);
+      color:var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+    }
+    .wrap{ max-width:1200px; margin:0 auto; padding:20px; display:flex; flex-direction:column; gap:var(--grid-gap); }
+
+    header{ display:flex; align-items:center; justify-content:space-between; gap:12px 16px; flex-wrap:wrap; }
+    .title{ font-size:clamp(20px,3vw,28px); font-weight:800; display:flex; align-items:center; gap:10px; letter-spacing:.2px; }
+    .title .dot{ width:10px; height:10px; border-radius:50%; background:var(--modena-cyan); box-shadow:0 0 0 6px rgba(168,254,238,.18); }
+    .controls{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .file-btn, .pdf-btn{ display:inline-flex; align-items:center; gap:10px; background:linear-gradient(135deg, var(--modena-petrol), var(--modena-cyan)); color:#012B32; border:none; padding:10px 14px; border-radius:12px; cursor:pointer; box-shadow:var(--shadow); font-weight:800; font-family: inherit; font-size: 14px; }
+    .hint{ color:var(--muted); font-size:13px }
+
+    /* KPI */
+    .kpis{ display:grid; grid-template-columns:repeat(4,1fr); gap:var(--grid-gap); }
+    .kpi{
+      background:linear-gradient(180deg, var(--card-2), var(--card));
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:var(--radius);
+      padding:16px; box-shadow:var(--shadow); position:relative; overflow:hidden; min-height:110px; isolation:isolate;
+    }
+    .kpi::after{
+      content:""; position:absolute; right:-40px; top:-40px; width:140px; height:140px; border-radius:50%;
+      background:radial-gradient(closest-side, rgba(168,254,238,.28), transparent 70%); filter:blur(2px); z-index:-1;
+    }
+    .kpi .label{ color:var(--muted); font-size:13px }
+    .kpi .value{ font-size:clamp(18px,2.3vw,26px); font-weight:800; margin-top:6px }
+    .kpi .delta{ margin-top:6px; font-size:12px; display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); }
+    .delta.ok{ color:#BFF8EC; border-color:rgba(168,254,238,.35) }
+    .delta.warn{ color:#FFF0BF }
+    .delta.bad{ color:#FFD5D1 }
+
+    /* Graafikud 2×2 */
+    .charts{ display:grid; grid-template-columns:repeat(2,1fr); gap:var(--grid-gap); }
+    .card{ background:linear-gradient(180deg, var(--card-2), var(--card)); border:1px solid rgba(255,255,255,.06); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow); }
+    .card h3{ margin:0 0 10px; font-size:16px; color:var(--modena-light); letter-spacing:.2px; }
+    .canvas-wrap{ width:100%; height:280px; cursor:zoom-in; }
+
+    /* Andmetabel */
+    .table-card{ padding:0; overflow:hidden }
+    .table-head{ padding:14px 16px; border-bottom:1px solid rgba(255,255,255,.06); }
+    .table{ width:100%; border-collapse:collapse; font-size:14px; }
+    .table th,.table td{ padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); text-align:right; white-space:nowrap; }
+    .table th{ color:var(--muted); font-weight:700; text-align:right }
+    .table th:first-child, .table td:first-child{ text-align:left }
+    .table tr:hover{ background:rgba(168,254,238,.06) }
+
+    @media (max-width:1100px){ .kpis{ grid-template-columns:repeat(2,1fr) } .charts{ grid-template-columns:1fr } .canvas-wrap{ height:260px } }
+    @media (max-width:640px){ .kpis{ grid-template-columns:1fr } .wrap{ padding:14px } .canvas-wrap{ height:220px } .table th,.table td{ font-size:13px; padding:8px 10px } }
+
+    /* ---------- MODAL ---------- */
+    .modal{
+      position:fixed; inset:0; background:rgba(0,0,0,.55);
+      display:none; align-items:center; justify-content:center;
+      z-index:9999; padding:20px; backdrop-filter: blur(2px);
+    }
+    .modal.show{ display:flex }
+    .modal-card{
+      width:min(1050px, 96vw); height:min(82vh, 96vh);
+      background:linear-gradient(180deg, var(--card-2), var(--card));
+      border:1px solid rgba(255,255,255,.08); border-radius:20px;
+      box-shadow:0 20px 60px rgba(0,0,0,.45); padding:16px 16px 12px 16px;
+      display:flex; flex-direction:column; gap:10px; animation:pop .12s ease-out;
+    }
+    @keyframes pop { from{ transform:scale(.98); opacity:.6 } to{ transform:scale(1); opacity:1 } }
+    .modal-top{ display:flex; align-items:center; justify-content:space-between; gap:10px }
+    .modal-title{ margin:0; font-size:18px; color:var(--modena-light) }
+    .close-btn{
+      border:none; background:rgba(255,255,255,.06);
+      color:var(--text); width:36px; height:36px; border-radius:12px;
+      display:grid; place-items:center; cursor:pointer;
+    }
+    .modal-canvas{ flex:1 1 auto; min-height:0; }
+    .modal-canvas canvas{ width:100% !important; height:100% !important; }
+
+    /* ---------- PRINDI STIILID PDF-i JAOKS ---------- */
+    @media print {
+      @page {
+        size: landscape;
+        margin: 1.5cm;
+      }
+      body {
+        background: var(--bg) !important;
+        -webkit-print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+      .wrap {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        gap: 20px;
+      }
+      header .controls, .modal, .title .dot, .kpi::after {
+        display: none !important;
+      }
+      .card, .kpi, .table-card {
+        box-shadow: none !important;
+        border: 1px solid rgba(255,255,255,.1) !important;
+        background: linear-gradient(180deg, var(--card-2), var(--card)) !important;
+        page-break-inside: avoid;
+      }
+      .kpis { grid-template-columns: repeat(4, 1fr) !important; }
+      .charts { grid-template-columns: repeat(2, 1fr) !important; }
+      .title, .card h3, .kpi .value, .kpi .delta, .table td {
+        color: var(--text) !important;
+      }
+      .kpi .label, .table th {
+        color: var(--muted) !important;
+      }
+      .table th, .table td {
+        border-color: rgba(255,255,255,.1) !important;
+      }
+      .canvas-wrap { height: 240px !important; }
+      canvas { max-width: 100%; }
+      .table-card {
+        page-break-before: always;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title"><span class="dot"></span>Investor Portal Dashboard</div>
+      <div class="controls">
+        <label class="file-btn">
+          <input id="file" type="file" accept=".xlsx,.xls" hidden />
+          Laadi Excel
+        </label>
+        <button class="pdf-btn" id="pdf-btn">Tee PDF</button>
+      </div>
+    </header>
+
+    <section class="kpis">
+      <div class="kpi" id="kpi-assets">
+        <div class="label">Vault Assets (viimane kuu)</div>
+        <div class="value">–</div>
+        <div class="delta ok">⟰ 0.00%</div>
+      </div>
+      <div class="kpi" id="kpi-pool">
+        <div class="label">Assets Pool (viimane kuu)</div>
+        <div class="value">–</div>
+        <div class="delta ok">⟰ 0.00%</div>
+      </div>
+      <div class="kpi" id="kpi-return">
+        <div class="label">Vault avg return (%)</div>
+        <div class="value">–</div>
+        <div class="delta warn">ℹ viimane kuu</div>
+      </div>
+      <div class="kpi" id="kpi-cost">
+        <div class="label">Modena avg cost (%)</div>
+        <div class="value">–</div>
+        <div class="delta warn">ℹ viimane kuu</div>
+      </div>
+    </section>
+
+    <section class="charts">
+      <div class="card">
+        <h3>Vault Assets + Assets Pool</h3>
+        <div class="canvas-wrap"><canvas id="chartAssetsPool"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Interest</h3>
+        <div class="canvas-wrap"><canvas id="chartInterest"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Funds in vs Funds out</h3>
+        <div class="canvas-wrap"><canvas id="chartCashflow"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Cost split</h3>
+        <div class="canvas-wrap"><canvas id="chartCost"></canvas></div>
+      </div>
+    </section>
+
+    <section class="card table-card">
+      <div class="table-head"><h3 style="margin:0">Andmetabel</h3></div>
+      <div style="overflow:auto">
+        <table class="table" id="dataTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div id="chartModal" class="modal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <div class="modal-top">
+        <h3 class="modal-title" id="modalTitle">—</h3>
+        <button class="close-btn" id="modalClose" aria-label="Sule">✕</button>
+      </div>
+      <div class="modal-canvas">
+        <canvas id="modalChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ---------- Formaatijad ---------- */
+    const eur = new Intl.NumberFormat('et-EE', {
+      style:'currency', currency:'EUR', currencyDisplay:'narrowSymbol',
+      minimumFractionDigits:2, maximumFractionDigits:2
+    });
+    const fmtMoney = v => (v==null || isNaN(v)) ? "–" : eur.format(Number(v));
+    const fmtPct   = v => (v==null || isNaN(v)) ? "–" : (Number(v).toFixed(2).replace('.', ',') + ' %');
+    const norm = s => (s??'').toString().trim().toLowerCase().replace(/\s+/g,' ');
+
+    // robustne numbriparser
+    function toNumber(v){
+      if(v===null||v===undefined||v==='') return 0;
+      if(typeof v==='number') return v;
+      let s = String(v).trim()
+        .replace(/\s/g,'').replace(/[€]/g,'').replace(/−|–/g,'-');
+      const lastDot = s.lastIndexOf('.'); const lastCom = s.lastIndexOf(',');
+      let dec = null;
+      if(lastDot>-1 && lastCom>-1) dec = (lastDot>lastCom) ? '.' : ',';
+      else if(lastDot>-1) dec='.';
+      else if(lastCom>-1) dec=',';
+      if(dec===','){ s = s.replace(/\./g,''); s = s.replace(',', '.'); }
+      else if(dec==='.') { s = s.replace(/,/g,''); }
+      s = s.replace(/[^\d\.\-]/g,'');
+      const n = Number(s);
+      return isNaN(n) ? 0 : n;
+    }
+    function toPercentValue(v){
+      if(v===null||v===undefined||v==='') return null;
+      if(typeof v==='string' && v.includes('%')) return toNumber(v);
+      const n = toNumber(v);
+      return (n<=1 ? n*100 : n);
+    }
+    function excelDateToISO(d){
+      if (typeof d === 'string'){
+        const m = d.match(/^(\d{4}-\d{2}-\d{2})/);
+        return m ? m[1] : d;
+      }
+      if (typeof d === 'number'){
+        const epoch = new Date(Date.UTC(1899, 11, 30));
+        const jsDate = new Date(epoch.getTime() + d * 86400000);
+        return jsDate.toISOString().slice(0,10);
+      }
+      if (d instanceof Date) return d.toISOString().slice(0,10);
+      return '';
+    }
+    function detectHeaderRow(rows){
+      const wanted = ['vault assets','assets pool','vault avg return (%)','modena avg cost (%)','funds in','funds out'];
+      let bestIdx=-1, bestScore=-1;
+      rows.forEach((r,idx)=>{
+        if(!r || r.length===0) return;
+        const set = new Set(r.map(norm));
+        const score = wanted.reduce((a,w)=> a + (set.has(w)?1:0), 0);
+        if(score>bestScore){ bestScore=score; bestIdx=idx; }
+      });
+      return (bestScore>=2) ? bestIdx : -1;
+    }
+    function detectHighlightsStart(rows){
+      for(let i=0;i<rows.length;i++){
+        const has = (rows[i]||[]).some(c => /highl/i.test(String(c||'')));
+        if(has) return i;
+      }
+      return -1;
+    }
+
+    /* ---------- Chart värvid ---------- */
+    const C = {
+      lineAssets: getComputedStyle(document.documentElement).getPropertyValue('--modena-cyan').trim(),
+      linePool:   getComputedStyle(document.documentElement).getPropertyValue('--modena-light').trim(),
+      lineReturn: '#6FE8D6',
+      lineCost:   '#59C9BE',
+      barIn:      getComputedStyle(document.documentElement).getPropertyValue('--modena-cyan').trim(),
+      barOut:     getComputedStyle(document.documentElement).getPropertyValue('--modena-petrol').trim(),
+      cost1: '#6FE8D6', cost2: '#59C9BE', cost3: '#2BA8A3', cost4: '#147B7C'
+    };
+
+    // jagatud tooltip (€/%)
+    const sharedInteraction = { mode:'index', intersect:false, axis:'x' };
+    const tooltipStyle = {
+      callbacks:{
+        label: function(ctx){
+          const name = ctx.dataset.label ? ctx.dataset.label + ': ' : '';
+          const y = ctx.parsed.y;
+          if(ctx.dataset._pct)  return name + (Number(y).toFixed(2)) + ' %';
+          return name + eur.format(Number(y));
+        }
+      }
+    };
+
+    // olemasolevad graafikud
+    let chartAssetsPool, chartInterest, chartCashflow, chartCost;
+
+    function destroyCharts(){ [chartAssetsPool, chartInterest, chartCashflow, chartCost].forEach(ch=>{ if(ch) ch.destroy(); }); }
+
+    function makeLineMulti(ctx, labels, datasets){
+      return new Chart(ctx, {
+        type:'line',
+        data:{ labels, datasets },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          interaction: sharedInteraction,
+          plugins:{ legend:{labels:{color:'#DDF2F0'}}, tooltip: tooltipStyle },
+          scales:{
+            x:{ ticks:{ color:'#DDF2F0' }, grid:{ color:'rgba(255,255,255,.06)' } },
+            y:{ ticks:{ color:'#DDF2F0' }, grid:{ color:'rgba(255,255,255,.06)' } }
+          }
+        }
+      });
+    }
+    function makeBar(ctx, labels, d1, d2, c1, c2){
+      return new Chart(ctx, {
+        type:'bar',
+        data:{ labels, datasets:[
+          {label:'Funds in',  data:d1, backgroundColor:c1+'cc', borderColor:c1, borderWidth:1},
+          {label:'Funds out', data:d2, backgroundColor:c2+'cc', borderColor:c2, borderWidth:1}
+        ]},
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          interaction: sharedInteraction,
+          plugins:{ legend:{labels:{color:'#DDF2F0'}}, tooltip: tooltipStyle },
+          scales:{
+            x:{ ticks:{ color:'#DDF2F0' }, grid:{ color:'rgba(255,255,255,.06)' } },
+            y:{ ticks:{ color:'#DDF2F0' }, grid:{ color:'rgba(255,255,255,.06)' } }
+          }
+        }
+      });
+    }
+    function makeStacked(ctx, labels, stacks, colors){
+      const keys = Object.keys(stacks);
+      const datasets = keys.map((k,i)=>({
+        label:k, data:stacks[k], backgroundColor:colors[i]+'e6', borderColor:colors[i], borderWidth:1
+      }));
+      return new Chart(ctx, {
+        type:'bar',
+        data:{ labels, datasets },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          interaction: sharedInteraction,
+          plugins:{ legend:{labels:{color:'#DDF2F0'}}, tooltip: tooltipStyle },
+          scales:{
+            x:{ stacked:true, ticks:{ color:'#DDF2F0' }, grid:{ color:'rgba(255,255,255,.06)' } },
+            y:{ stacked:true, ticks:{ color:'#DDF2F0' }, grid:{ color:'rgba(255,255,255,.06)' } }
+          }
+        }
+      });
+    }
+
+    /* ---------- KPI ---------- */
+    function updateKpis(series){
+      if(series.length===0) return;
+      const last = series[series.length-1];
+      const prev = series[series.length-2] || series[series.length-1];
+      const chg=(a,b)=> (b && a!==undefined) ? ((a-b)/Math.abs(b))*100 : 0;
+
+      const elA=document.querySelector('#kpi-assets'),
+            elP=document.querySelector('#kpi-pool'),
+            elR=document.querySelector('#kpi-return'),
+            elC=document.querySelector('#kpi-cost');
+
+      const aD = chg(last.vaultAssets, prev.vaultAssets);
+      elA.querySelector('.value').textContent = fmtMoney(last.vaultAssets);
+      elA.querySelector('.delta').textContent = (aD>=0?'⟰ ':'⟱ ')+aD.toFixed(2).replace('.',',')+'%';
+      elA.querySelector('.delta').className = 'delta '+(aD>=0?'ok':'bad');
+
+      const pD = chg(last.assetsPool, prev.assetsPool);
+      elP.querySelector('.value').textContent = fmtMoney(last.assetsPool);
+      elP.querySelector('.delta').textContent = (pD>=0?'⟰ ':'⟱ ')+pD.toFixed(2).replace('.',',')+'%';
+      elP.querySelector('.delta').className = 'delta '+(pD>=0?'ok':'bad');
+
+      elR.querySelector('.value').textContent = fmtPct(last.vaultAvgReturnPct);
+      elC.querySelector('.value').textContent = fmtPct(last.modenaAvgCostPct);
+    }
+
+    /* ---------- Tabel ---------- */
+    function renderTable(headers, rows){
+      const thead = document.querySelector('#dataTable thead');
+      const tbody = document.querySelector('#dataTable tbody');
+      thead.innerHTML=''; tbody.innerHTML='';
+
+      const trh=document.createElement('tr');
+      headers.forEach(h=>{ const th=document.createElement('th'); th.textContent=h; trh.appendChild(th); });
+      thead.appendChild(trh);
+
+      const moneyCols = new Set([
+        'vault assets','assets pool','funds in','funds out','accrued interest','bonuses','circlewise','influencers (direct)'
+      ]);
+      const percentCols = new Set(['vault avg return (%)','modena avg cost (%)']);
+
+      rows.forEach(r=>{
+        const tr=document.createElement('tr');
+        r.forEach((cell,idx)=>{
+          const td=document.createElement('td');
+          if(idx===0){ td.textContent = cell; }
+          else{
+            const head = norm(headers[idx]||'');
+            if(percentCols.has(head)) td.textContent = fmtPct(cell);
+            else if(moneyCols.has(head)) td.textContent = fmtMoney(cell);
+            else td.textContent = (typeof cell==='number') ? (Number.isInteger(cell)? cell : cell.toFixed(2)) : (cell ?? '');
+          }
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    /* ---------- ÜLDMUUTUJAD POP-UP JA ANDMETE JAGAMISEKS ---------- */
+    const state = { labels:[], arrVA:[], arrAP:[], arrRet:[], arrCost:[], arrIn:[], arrOut:[], acc:[], bon:[], cir:[], inf:[] };
+
+    /* ---------- Excel → Dashboard ---------- */
+    function buildFromMatrix(rows){
+      if(!rows || rows.length < 4){ alert('Failis ei paista olevat piisavalt ridu.'); return; }
+
+      const hiIdx = detectHighlightsStart(rows);
+      if(hiIdx !== -1) rows = rows.slice(0, hiIdx);
+
+      const headerIdx = detectHeaderRow(rows);
+      if(headerIdx === -1){ alert('Ei leidnud päiseread (otsin nt "Vault Assets", "Assets Pool", "Funds in/out").'); return; }
+
+      const headerRow = rows[headerIdx];
+      const dataRows  = rows.slice(headerIdx+1);
+
+      const findCol = name => headerRow.findIndex(h => norm(h) === norm(name));
+      const colDate = 0;
+
+      const colVA = findCol('Vault Assets');
+      const colAP = findCol('Assets Pool');
+      const colRet= findCol('Vault avg return (%)');
+      const colCost=findCol('Modena avg cost (%)');
+      const colIn = findCol('Funds in');
+      const colOut= findCol('Funds out');
+      const colAcc= findCol('Accrued Interest');
+      const colBon= findCol('Bonuses');
+      const colCir= findCol('Circlewise');
+      const colInf= findCol('Influencers (Direct)');
+
+      const required=[colVA,colAP,colRet,colCost,colIn,colOut];
+      if(required.some(i=>i===-1)) alert('Mõni nõutud päis puudub (Vault Assets, Assets Pool, Return/Cost %, Funds in/out).');
+
+      const tableHeaders = ['Date'].concat(headerRow.slice(1).map(h=>h??''));
+      const tableRows=[];
+
+      // puhasta state
+      Object.keys(state).forEach(k=> state[k]=[]);
+
+      dataRows.forEach(r=>{
+        if(!r || r.length===0 || r[colDate]==='' || r[colDate]==null) return;
+
+        const dISO = excelDateToISO(r[colDate]); state.labels.push(dISO);
+
+        const vaultAssets = toNumber(r[colVA]);
+        const assetsPool  = toNumber(r[colAP]);
+        const vaultAvgReturnPct = toPercentValue(r[colRet]);
+        const modenaAvgCostPct  = toPercentValue(r[colCost]);
+        const fundsIn = toNumber(r[colIn]);
+        const fundsOut= toNumber(r[colOut]);
+        const accrued = toNumber(r[colAcc]);
+        const bonuses = toNumber(r[colBon]);
+        const circle  = toNumber(r[colCir]);
+        const influ   = toNumber(r[colInf]);
+
+        state.arrVA.push(vaultAssets); state.arrAP.push(assetsPool);
+        state.arrRet.push(vaultAvgReturnPct); state.arrCost.push(modenaAvgCostPct);
+        state.arrIn.push(fundsIn); state.arrOut.push(fundsOut);
+        state.acc.push(accrued); state.bon.push(bonuses); state.cir.push(circle); state.inf.push(influ);
+
+        const row=[dISO];
+        for(let i=1;i<headerRow.length;i++){
+          const head = norm(headerRow[i]||'');
+          let val = r[i];
+          if(head.includes('%')) val = toPercentValue(val);
+          else val = toNumber(val);
+          row.push(val);
+        }
+        tableRows.push(row);
+      });
+
+      // KPI
+      const series = state.labels.map((d,i)=>({
+        date:d, vaultAssets:state.arrVA[i], assetsPool:state.arrAP[i],
+        vaultAvgReturnPct:state.arrRet[i], modenaAvgCostPct:state.arrCost[i]
+      }));
+      updateKpis(series);
+
+      // Graafikud
+      destroyCharts();
+      chartAssetsPool = makeLineMulti(
+        document.getElementById('chartAssetsPool'),
+        state.labels,
+        [
+          { label:'Assets', data:state.arrVA, tension:0.3, borderWidth:2, pointRadius:2,
+            borderColor:C.lineAssets, backgroundColor:C.lineAssets+'33' },
+          { label:'Pool',   data:state.arrAP, tension:0.3, borderWidth:2, pointRadius:2,
+            borderColor:C.linePool,   backgroundColor:C.linePool+'33' }
+        ]
+      );
+      chartInterest = makeLineMulti(
+        document.getElementById('chartInterest'),
+        state.labels,
+        [
+          { label:'Vault avg return (%)', data:state.arrRet, tension:0.3, borderWidth:2, pointRadius:2,
+            borderColor:C.lineReturn, backgroundColor:C.lineReturn+'33', _pct:true },
+          { label:'Modena avg cost (%)',  data:state.arrCost, tension:0.3, borderWidth:2, pointRadius:2,
+            borderColor:C.lineCost,   backgroundColor:C.lineCost+'33',   _pct:true }
+        ]
+      );
+      chartCashflow = makeBar(
+        document.getElementById('chartCashflow'),
+        state.labels, state.arrIn, state.arrOut, C.barIn, C.barOut
+      );
+      chartCost = makeStacked(
+        document.getElementById('chartCost'),
+        state.labels,
+        { 'Accrued Interest':state.acc, 'Bonuses':state.bon, 'Circlewise':state.cir, 'Influencers (Direct)':state.inf },
+        [C.cost1,C.cost2,C.cost3,C.cost4]
+      );
+
+      // Tabel
+      renderTable(tableHeaders, tableRows);
+
+      // klikk → modal
+      bindModalOpeners();
+    }
+
+    /* ---------- FAILI LAADIMINE ---------- */
+    document.getElementById('file').addEventListener('change', async (e)=>{
+      const file = e.target.files?.[0]; if(!file) return;
+      const arrayBuffer = await file.arrayBuffer();
+      const wb = XLSX.read(arrayBuffer, {type:'array'});
+      const sheetName = wb.SheetNames.includes('Leht1') ? 'Leht1' : wb.SheetNames[0];
+      const sheet = wb.Sheets[sheetName];
+      let rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true});
+      buildFromMatrix(rows);
+    });
+
+    /* ---------- PDF GENEREERIMINE ---------- */
+    document.getElementById('pdf-btn').addEventListener('click', () => {
+      window.print();
+    });
+
+    /* ---------- MODAL LOOGIKA ---------- */
+    let modalChart = null;
+    const modalEl = document.getElementById('chartModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalClose = document.getElementById('modalClose');
+
+    function openChartModal(title, type, labels, datasets, stacked=false){
+      document.body.style.overflow = 'hidden';
+      modalTitle.textContent = title;
+      if(modalChart) { modalChart.destroy(); modalChart = null; }
+      const ctx = document.getElementById('modalChart').getContext('2d');
+      const base = {
+        type: type === 'bar' ? 'bar' : 'line',
+        data: { labels, datasets },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          interaction: { mode:'index', intersect:false, axis:'x' },
+          plugins:{ legend:{labels:{color:'#DDF2F0'}}, tooltip: {
+            callbacks:{
+              label: function(c){
+                const name = c.dataset.label ? c.dataset.label + ': ' : '';
+                const y = c.parsed.y;
+                if(c.dataset._pct) return name + (Number(y).toFixed(2)) + ' %';
+                return name + eur.format(Number(y));
+              }
+            }
+          }},
+          scales:{
+            x:{ ticks:{ color:'#DDF2F0' }, grid:{ color:'rgba(255,255,255,.06)' } },
+            y:{ ticks:{ color:'#DDF2F0' }, grid:{ color:'rgba(255,255,255,.06)' }, stacked: stacked }
+          }
+        }
+      };
+      if(type === 'bar' && stacked){
+        base.options.scales.x.stacked = true;
+        base.options.scales.y.stacked = true;
+      }
+      modalChart = new Chart(ctx, base);
+      modalEl.classList.add('show');
+      modalEl.setAttribute('aria-hidden','false');
+    }
+
+    function closeChartModal(){
+      modalEl.classList.remove('show');
+      modalEl.setAttribute('aria-hidden','true');
+      document.body.style.overflow = '';
+      if(modalChart){ modalChart.destroy(); modalChart=null; }
+    }
+
+    modalClose.addEventListener('click', closeChartModal);
+    modalEl.addEventListener('click', (e)=>{ if(e.target === modalEl) closeChartModal(); });
+    window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && modalEl.classList.contains('show')) closeChartModal(); });
+
+    function bindModalOpeners(){
+      const el1 = document.getElementById('chartAssetsPool');
+      const el2 = document.getElementById('chartInterest');
+      const el3 = document.getElementById('chartCashflow');
+      const el4 = document.getElementById('chartCost');
+
+      el1.onclick = ()=> openChartModal('Vault Assets + Assets Pool', 'line', state.labels, [
+        { label:'Assets', data:state.arrVA, tension:0.3, borderWidth:2, pointRadius:3, borderColor:C.lineAssets, backgroundColor:C.lineAssets+'33' },
+        { label:'Pool',   data:state.arrAP, tension:0.3, borderWidth:2, pointRadius:3, borderColor:C.linePool,   backgroundColor:C.linePool+'33' }
+      ], false);
+
+      el2.onclick = ()=> openChartModal('Interest', 'line', state.labels, [
+        { label:'Vault avg return (%)', data:state.arrRet, tension:0.3, borderWidth:2, pointRadius:3, borderColor:C.lineReturn, backgroundColor:C.lineReturn+'33', _pct:true },
+        { label:'Modena avg cost (%)',  data:state.arrCost, tension:0.3, borderWidth:2, pointRadius:3, borderColor:C.lineCost,   backgroundColor:C.lineCost+'33',   _pct:true }
+      ], false);
+
+      el3.onclick = ()=> openChartModal('Funds in vs Funds out', 'bar', state.labels, [
+        { label:'Funds in',  data:state.arrIn,  borderWidth:1, backgroundColor:C.barIn+'cc',  borderColor:C.barIn },
+        { label:'Funds out', data:state.arrOut, borderWidth:1, backgroundColor:C.barOut+'cc', borderColor:C.barOut }
+      ], false);
+
+      el4.onclick = ()=> openChartModal('Cost split', 'bar', state.labels, [
+        { label:'Accrued Interest', data:state.acc, backgroundColor:C.cost1+'e6', borderColor:C.cost1, borderWidth:1 },
+        { label:'Bonuses',          data:state.bon, backgroundColor:C.cost2+'e6', borderColor:C.cost2, borderWidth:1 },
+        { label:'Circlewise',       data:state.cir, backgroundColor:C.cost3+'e6', borderColor:C.cost3, borderWidth:1 },
+        { label:'Influencers (Direct)', data:state.inf, backgroundColor:C.cost4+'e6', borderColor:C.cost4, borderWidth:1 }
+      ], true);
+    }
+  </script>
+</body>
+</html>

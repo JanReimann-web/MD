@@ -7,6 +7,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   
   <style>
     :root{
@@ -109,47 +111,417 @@
     .modal-canvas{ flex:1 1 auto; min-height:0; }
     .modal-canvas canvas{ width:100% !important; height:100% !important; }
 
+    /* ---------- PDF EXPORT STIILID ---------- */
+    .pdf-export-mode {
+      background: linear-gradient(180deg, #001b22 0%, #012B32 55%, #00161c 100%) !important;
+      color: #ECF5F3 !important;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial !important;
+      padding: 20px !important;
+      margin: 0 !important;
+      width: 1400px !important;
+      height: 900px !important;
+      overflow: hidden !important;
+      position: relative !important;
+    }
+    
+    .pdf-export-mode .wrap {
+      max-width: 100% !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      gap: 12px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      height: 100% !important;
+    }
+    
+    .pdf-export-mode header {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      margin-bottom: 12px !important;
+      padding-bottom: 8px !important;
+      border-bottom: 1px solid rgba(255,255,255,.15) !important;
+    }
+    
+    .pdf-export-mode .title {
+      font-size: 20px !important;
+      font-weight: 800 !important;
+      color: #ECF5F3 !important;
+      margin: 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+    }
+    
+    .pdf-export-mode .controls, .pdf-export-mode .modal, .pdf-export-mode .title .dot, .pdf-export-mode .kpi::after {
+      display: none !important;
+    }
+    
+    .pdf-export-mode .kpis {
+      display: grid !important;
+      grid-template-columns: repeat(4, 1fr) !important;
+      gap: 10px !important;
+      margin-bottom: 12px !important;
+    }
+    
+    .pdf-export-mode .kpi {
+      background: linear-gradient(180deg, #0F2229, #0E1C22) !important;
+      border: 1px solid rgba(255,255,255,.15) !important;
+      border-radius: 12px !important;
+      padding: 12px !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,.3) !important;
+      min-height: 80px !important;
+      position: relative !important;
+    }
+    
+    .pdf-export-mode .kpi .label {
+      color: #B9C8C6 !important;
+      font-size: 11px !important;
+      margin-bottom: 4px !important;
+    }
+    
+    .pdf-export-mode .kpi .value {
+      font-size: 16px !important;
+      font-weight: 800 !important;
+      color: #ECF5F3 !important;
+      margin-bottom: 4px !important;
+    }
+    
+    .pdf-export-mode .kpi .delta {
+      font-size: 10px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 4px !important;
+      padding: 2px 6px !important;
+      border-radius: 999px !important;
+      background: rgba(255,255,255,.08) !important;
+      border: 1px solid rgba(255,255,255,.12) !important;
+    }
+    
+    .pdf-export-mode .delta.ok {
+      color: #BFF8EC !important;
+      border-color: rgba(168,254,238,.4) !important;
+    }
+    
+    .pdf-export-mode .delta.warn {
+      color: #FFF0BF !important;
+    }
+    
+    .pdf-export-mode .delta.bad {
+      color: #FFD5D1 !important;
+    }
+    
+    .pdf-export-mode .charts {
+      display: grid !important;
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 10px !important;
+      margin-bottom: 12px !important;
+      flex: 1 !important;
+    }
+    
+    .pdf-export-mode .card {
+      background: linear-gradient(180deg, #0F2229, #0E1C22) !important;
+      border: 1px solid rgba(255,255,255,.15) !important;
+      border-radius: 12px !important;
+      padding: 12px !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,.3) !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    
+    .pdf-export-mode .card h3 {
+      margin: 0 0 8px 0 !important;
+      font-size: 14px !important;
+      color: #DEF4F2 !important;
+      font-weight: 600 !important;
+    }
+    
+    .pdf-export-mode .canvas-wrap {
+      width: 100% !important;
+      height: 160px !important;
+      position: relative !important;
+      flex: 1 !important;
+    }
+    
+    .pdf-export-mode canvas {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100% !important;
+      border-radius: 6px !important;
+    }
+    
+    .pdf-export-mode .table-card {
+      background: linear-gradient(180deg, #0F2229, #0E1C22) !important;
+      border: 1px solid rgba(255,255,255,.15) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,.3) !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      height: 180px !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    
+    .pdf-export-mode .table-head {
+      padding: 10px 12px !important;
+      border-bottom: 1px solid rgba(255,255,255,.15) !important;
+      background: rgba(255,255,255,.03) !important;
+      flex-shrink: 0 !important;
+    }
+    
+    .pdf-export-mode .table-head h3 {
+      margin: 0 !important;
+      font-size: 14px !important;
+      color: #DEF4F2 !important;
+      font-weight: 600 !important;
+    }
+    
+    .pdf-export-mode .table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      font-size: 11px !important;
+      background: transparent !important;
+      flex: 1 !important;
+    }
+    
+    .pdf-export-mode .table th, .pdf-export-mode .table td {
+      padding: 6px 8px !important;
+      border-bottom: 1px solid rgba(255,255,255,.08) !important;
+      text-align: right !important;
+      color: #ECF5F3 !important;
+    }
+    
+    .pdf-export-mode .table th {
+      color: #B9C8C6 !important;
+      font-weight: 700 !important;
+      background: rgba(255,255,255,.05) !important;
+      font-size: 10px !important;
+    }
+    
+    .pdf-export-mode .table th:first-child, .pdf-export-mode .table td:first-child {
+      text-align: left !important;
+    }
+    
+    .pdf-export-mode .table tbody {
+      overflow-y: auto !important;
+      max-height: 120px !important;
+    }
+
     /* ---------- PRINDI STIILID PDF-i JAOKS ---------- */
     @media print {
       @page {
-        size: landscape;
-        margin: 1.5cm;
+        size: A4 landscape;
+        margin: 1.2cm;
+        background: #012B32;
       }
-      body {
-        background: var(--bg) !important;
+      
+      /* Add a print-specific title */
+      body::before {
+        content: "Investor Portal Dashboard - " attr(data-print-date);
+        display: block;
+        font-size: 14px;
+        color: #B9C8C6;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255,255,255,.1);
+      }
+      
+      * {
         -webkit-print-color-adjust: exact !important;
         color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
+      
+      body {
+        background: linear-gradient(180deg, #001b22 0%, #012B32 55%, #00161c 100%) !important;
+        color: #ECF5F3 !important;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      
       .wrap {
         max-width: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
-        gap: 20px;
+        gap: 16px !important;
+        display: flex !important;
+        flex-direction: column !important;
       }
-      header .controls, .modal, .title .dot, .kpi::after {
+      
+      header {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        margin-bottom: 16px !important;
+        padding-bottom: 12px !important;
+        border-bottom: 1px solid rgba(255,255,255,.1) !important;
+      }
+      
+      .title {
+        font-size: 24px !important;
+        font-weight: 800 !important;
+        color: #ECF5F3 !important;
+        margin: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+      }
+      
+      .controls, .modal, .title .dot, .kpi::after {
         display: none !important;
       }
-      .card, .kpi, .table-card {
-        box-shadow: none !important;
-        border: 1px solid rgba(255,255,255,.1) !important;
-        background: linear-gradient(180deg, var(--card-2), var(--card)) !important;
-        page-break-inside: avoid;
+      
+      .kpis {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 16px !important;
+        margin-bottom: 20px !important;
       }
-      .kpis { grid-template-columns: repeat(4, 1fr) !important; }
-      .charts { grid-template-columns: repeat(2, 1fr) !important; }
-      .title, .card h3, .kpi .value, .kpi .delta, .table td {
-        color: var(--text) !important;
+      
+      .kpi {
+        background: linear-gradient(180deg, #0F2229, #0E1C22) !important;
+        border: 1px solid rgba(255,255,255,.15) !important;
+        border-radius: 16px !important;
+        padding: 16px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,.3) !important;
+        page-break-inside: avoid !important;
+        min-height: 110px !important;
+        position: relative !important;
       }
-      .kpi .label, .table th {
-        color: var(--muted) !important;
+      
+      .kpi .label {
+        color: #B9C8C6 !important;
+        font-size: 13px !important;
+        margin-bottom: 6px !important;
       }
-      .table th, .table td {
-        border-color: rgba(255,255,255,.1) !important;
+      
+      .kpi .value {
+        font-size: 22px !important;
+        font-weight: 800 !important;
+        color: #ECF5F3 !important;
+        margin-bottom: 6px !important;
       }
-      .canvas-wrap { height: 240px !important; }
-      canvas { max-width: 100%; }
+      
+      .kpi .delta {
+        font-size: 12px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        padding: 4px 8px !important;
+        border-radius: 999px !important;
+        background: rgba(255,255,255,.08) !important;
+        border: 1px solid rgba(255,255,255,.12) !important;
+      }
+      
+      .delta.ok {
+        color: #BFF8EC !important;
+        border-color: rgba(168,254,238,.4) !important;
+      }
+      
+      .delta.warn {
+        color: #FFF0BF !important;
+      }
+      
+      .delta.bad {
+        color: #FFD5D1 !important;
+      }
+      
+      .charts {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 16px !important;
+        margin-bottom: 20px !important;
+      }
+      
+      .card {
+        background: linear-gradient(180deg, #0F2229, #0E1C22) !important;
+        border: 1px solid rgba(255,255,255,.15) !important;
+        border-radius: 16px !important;
+        padding: 16px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,.3) !important;
+        page-break-inside: avoid !important;
+      }
+      
+      .card h3 {
+        margin: 0 0 12px 0 !important;
+        font-size: 16px !important;
+        color: #DEF4F2 !important;
+        font-weight: 600 !important;
+      }
+      
+      .canvas-wrap {
+        width: 100% !important;
+        height: 260px !important;
+        position: relative !important;
+      }
+      
+      canvas {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        border-radius: 8px !important;
+      }
+      
       .table-card {
-        page-break-before: always;
+        background: linear-gradient(180deg, #0F2229, #0E1C22) !important;
+        border: 1px solid rgba(255,255,255,.15) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,.3) !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        page-break-inside: avoid !important;
+      }
+      
+      .table-head {
+        padding: 16px !important;
+        border-bottom: 1px solid rgba(255,255,255,.15) !important;
+        background: rgba(255,255,255,.03) !important;
+      }
+      
+      .table-head h3 {
+        margin: 0 !important;
+        font-size: 16px !important;
+        color: #DEF4F2 !important;
+        font-weight: 600 !important;
+      }
+      
+      .table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 14px !important;
+        background: transparent !important;
+      }
+      
+      .table th, .table td {
+        padding: 12px !important;
+        border-bottom: 1px solid rgba(255,255,255,.1) !important;
+        text-align: right !important;
+        color: #ECF5F3 !important;
+      }
+      
+      .table th {
+        color: #B9C8C6 !important;
+        font-weight: 700 !important;
+        background: rgba(255,255,255,.05) !important;
+      }
+      
+      .table th:first-child, .table td:first-child {
+        text-align: left !important;
+      }
+      
+      .table tr:hover {
+        background: rgba(168,254,238,.08) !important;
+      }
+      
+      /* Ensure proper page breaks */
+      .table-card {
+        page-break-before: always !important;
+      }
+      
+      /* Hide any potential scrollbars */
+      * {
+        overflow: visible !important;
       }
     }
   </style>
@@ -567,8 +939,91 @@
     });
 
     /* ---------- PDF GENEREERIMINE ---------- */
-    document.getElementById('pdf-btn').addEventListener('click', () => {
-      window.print();
+    document.getElementById('pdf-btn').addEventListener('click', async () => {
+      const pdfBtn = document.getElementById('pdf-btn');
+      const originalText = pdfBtn.textContent;
+      pdfBtn.textContent = 'Genereerin PDF...';
+      pdfBtn.disabled = true;
+      
+      try {
+        // Ensure all charts are properly rendered
+        if (chartAssetsPool) {
+          chartAssetsPool.resize();
+          chartAssetsPool.update('none');
+        }
+        if (chartInterest) {
+          chartInterest.resize();
+          chartInterest.update('none');
+        }
+        if (chartCashflow) {
+          chartCashflow.resize();
+          chartCashflow.update('none');
+        }
+        if (chartCost) {
+          chartCost.resize();
+          chartCost.update('none');
+        }
+        
+        // Create a temporary container for PDF export
+        const originalBody = document.body;
+        const pdfContainer = document.createElement('div');
+        pdfContainer.className = 'pdf-export-mode';
+        pdfContainer.innerHTML = originalBody.innerHTML;
+        
+        // Hide original content and show PDF container
+        originalBody.style.display = 'none';
+        document.documentElement.appendChild(pdfContainer);
+        
+        // Wait for charts to render
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Generate PDF using html2canvas and jsPDF
+        const canvas = await html2canvas(pdfContainer, {
+          backgroundColor: '#012B32',
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          width: 1400,
+          height: 900
+        });
+        
+        const imgData = canvas.toDataURL('image/png');
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+          orientation: 'landscape',
+          unit: 'mm',
+          format: 'a4'
+        });
+        
+        // Calculate dimensions to fit the image on one page
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = pdfWidth;
+        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+        
+        // Add the image to PDF
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        
+        // Generate filename with current date
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('et-EE').replace(/\./g, '-');
+        const timeStr = now.toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' }).replace(':', '-');
+        const filename = `Investor-Portal-Dashboard_${dateStr}_${timeStr}.pdf`;
+        
+        // Save the PDF
+        pdf.save(filename);
+        
+        // Clean up
+        document.documentElement.removeChild(pdfContainer);
+        originalBody.style.display = '';
+        
+      } catch (error) {
+        console.error('PDF genereerimise viga:', error);
+        alert('PDF genereerimisel tekkis viga. Palun proovi uuesti.');
+      } finally {
+        pdfBtn.textContent = originalText;
+        pdfBtn.disabled = false;
+      }
     });
 
     /* ---------- MODAL LOOGIKA ---------- */

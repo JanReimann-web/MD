@@ -967,6 +967,9 @@
           closeChartModal();
         }
         
+        // Apply PDF export mode to hide buttons and optimize layout
+        document.body.classList.add('pdf-export-mode');
+        
         // Scroll to top to ensure full capture
         window.scrollTo(0, 0);
         
@@ -1036,7 +1039,7 @@
         }
         
         const pdf = new jsPDFConstructor({
-          orientation: 'landscape',
+          orientation: 'portrait',
           unit: 'mm',
           format: 'a4',
           compress: true
@@ -1045,28 +1048,26 @@
         // Calculate dimensions to fit the image on the page
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
-        const margin = 10;
-        const imgWidth = pdfWidth - (margin * 2);
+        const margin = 0; // Remove margins completely
+        const imgWidth = pdfWidth;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
         
         console.log('PDF dimensions:', pdfWidth, 'x', pdfHeight);
         console.log('Image dimensions:', imgWidth, 'x', imgHeight);
         
-        // Add image to PDF
-        let heightLeft = imgHeight;
-        let position = margin;
+        // Add image to PDF as one long page
+        // Calculate the total height needed for the content
+        const totalHeight = imgHeight;
         
-        // Add the first page
-        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-        heightLeft -= (pdfHeight - margin * 2);
-        
-        // Add additional pages if needed
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight + margin;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-          heightLeft -= (pdfHeight - margin * 2);
+        // If content is taller than A4, we'll create a custom page size
+        if (totalHeight > pdfHeight) {
+          // Create a custom page size that fits the content
+          const customHeight = Math.max(totalHeight, 297); // At least A4 height
+          pdf.internal.pageSize.setHeight(customHeight);
         }
+        
+        // Add the image to fill the entire page
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
         
         // Generate filename with current date
         const now = new Date();
@@ -1087,6 +1088,8 @@
         console.error('Error stack:', error.stack);
         alert('PDF genereerimisel tekkis viga:\n\n' + error.message + '\n\nVaata konsool (F12) täpsema info jaoks.');
       } finally {
+        // Remove PDF export mode
+        document.body.classList.remove('pdf-export-mode');
         pdfBtn.textContent = originalText;
         pdfBtn.disabled = false;
       }

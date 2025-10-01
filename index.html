@@ -532,8 +532,8 @@
       <div class="title"><span class="dot"></span>Investor Portal Dashboard</div>
       <div class="controls">
         <label class="file-btn">
-          <input id="file" type="file" accept=".xlsx,.xls" hidden />
-          Laadi Excel
+          <input id="file" type="file" accept=".xlsx,.xls,.csv" hidden />
+          Laadi andmed
         </label>
         <button class="pdf-btn" id="pdf-btn">Tee PDF</button>
       </div>
@@ -930,11 +930,41 @@
     /* ---------- FAILI LAADIMINE ---------- */
     document.getElementById('file').addEventListener('change', async (e)=>{
       const file = e.target.files?.[0]; if(!file) return;
-      const arrayBuffer = await file.arrayBuffer();
-      const wb = XLSX.read(arrayBuffer, {type:'array'});
-      const sheetName = wb.SheetNames.includes('Leht1') ? 'Leht1' : wb.SheetNames[0];
-      const sheet = wb.Sheets[sheetName];
-      let rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true});
+      
+      let rows = [];
+      
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        // Handle CSV files
+        const text = await file.text();
+        const lines = text.split('\n').filter(line => line.trim());
+        rows = lines.map(line => {
+          // Simple CSV parsing - split by comma and handle quoted values
+          const result = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+              result.push(current.trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          result.push(current.trim());
+          return result;
+        });
+      } else {
+        // Handle Excel files
+        const arrayBuffer = await file.arrayBuffer();
+        const wb = XLSX.read(arrayBuffer, {type:'array'});
+        const sheetName = wb.SheetNames.includes('Leht1') ? 'Leht1' : wb.SheetNames[0];
+        const sheet = wb.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true});
+      }
+      
       buildFromMatrix(rows);
     });
 

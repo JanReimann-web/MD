@@ -112,44 +112,218 @@
     /* ---------- PRINDI STIILID PDF-i JAOKS ---------- */
     @media print {
       @page {
-        size: landscape;
-        margin: 1.5cm;
+        size: A4 landscape;
+        margin: 1.2cm;
+        background: #012B32;
       }
-      body {
-        background: var(--bg) !important;
+      
+      /* Add a print-specific title */
+      body::before {
+        content: "Investor Portal Dashboard - " attr(data-print-date);
+        display: block;
+        font-size: 14px;
+        color: #B9C8C6;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(255,255,255,.1);
+      }
+      
+      * {
         -webkit-print-color-adjust: exact !important;
         color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
+      
+      body {
+        background: linear-gradient(180deg, #001b22 0%, #012B32 55%, #00161c 100%) !important;
+        color: #ECF5F3 !important;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      
       .wrap {
         max-width: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
-        gap: 20px;
+        gap: 16px !important;
+        display: flex !important;
+        flex-direction: column !important;
       }
-      header .controls, .modal, .title .dot, .kpi::after {
+      
+      header {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        margin-bottom: 16px !important;
+        padding-bottom: 12px !important;
+        border-bottom: 1px solid rgba(255,255,255,.1) !important;
+      }
+      
+      .title {
+        font-size: 24px !important;
+        font-weight: 800 !important;
+        color: #ECF5F3 !important;
+        margin: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+      }
+      
+      .controls, .modal, .title .dot, .kpi::after {
         display: none !important;
       }
-      .card, .kpi, .table-card {
-        box-shadow: none !important;
-        border: 1px solid rgba(255,255,255,.1) !important;
-        background: linear-gradient(180deg, var(--card-2), var(--card)) !important;
-        page-break-inside: avoid;
+      
+      .kpis {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 16px !important;
+        margin-bottom: 20px !important;
       }
-      .kpis { grid-template-columns: repeat(4, 1fr) !important; }
-      .charts { grid-template-columns: repeat(2, 1fr) !important; }
-      .title, .card h3, .kpi .value, .kpi .delta, .table td {
-        color: var(--text) !important;
+      
+      .kpi {
+        background: linear-gradient(180deg, #0F2229, #0E1C22) !important;
+        border: 1px solid rgba(255,255,255,.15) !important;
+        border-radius: 16px !important;
+        padding: 16px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,.3) !important;
+        page-break-inside: avoid !important;
+        min-height: 110px !important;
+        position: relative !important;
       }
-      .kpi .label, .table th {
-        color: var(--muted) !important;
+      
+      .kpi .label {
+        color: #B9C8C6 !important;
+        font-size: 13px !important;
+        margin-bottom: 6px !important;
       }
-      .table th, .table td {
-        border-color: rgba(255,255,255,.1) !important;
+      
+      .kpi .value {
+        font-size: 22px !important;
+        font-weight: 800 !important;
+        color: #ECF5F3 !important;
+        margin-bottom: 6px !important;
       }
-      .canvas-wrap { height: 240px !important; }
-      canvas { max-width: 100%; }
+      
+      .kpi .delta {
+        font-size: 12px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        padding: 4px 8px !important;
+        border-radius: 999px !important;
+        background: rgba(255,255,255,.08) !important;
+        border: 1px solid rgba(255,255,255,.12) !important;
+      }
+      
+      .delta.ok {
+        color: #BFF8EC !important;
+        border-color: rgba(168,254,238,.4) !important;
+      }
+      
+      .delta.warn {
+        color: #FFF0BF !important;
+      }
+      
+      .delta.bad {
+        color: #FFD5D1 !important;
+      }
+      
+      .charts {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 16px !important;
+        margin-bottom: 20px !important;
+      }
+      
+      .card {
+        background: linear-gradient(180deg, #0F2229, #0E1C22) !important;
+        border: 1px solid rgba(255,255,255,.15) !important;
+        border-radius: 16px !important;
+        padding: 16px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,.3) !important;
+        page-break-inside: avoid !important;
+      }
+      
+      .card h3 {
+        margin: 0 0 12px 0 !important;
+        font-size: 16px !important;
+        color: #DEF4F2 !important;
+        font-weight: 600 !important;
+      }
+      
+      .canvas-wrap {
+        width: 100% !important;
+        height: 260px !important;
+        position: relative !important;
+      }
+      
+      canvas {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        border-radius: 8px !important;
+      }
+      
       .table-card {
-        page-break-before: always;
+        background: linear-gradient(180deg, #0F2229, #0E1C22) !important;
+        border: 1px solid rgba(255,255,255,.15) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,.3) !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        page-break-inside: avoid !important;
+      }
+      
+      .table-head {
+        padding: 16px !important;
+        border-bottom: 1px solid rgba(255,255,255,.15) !important;
+        background: rgba(255,255,255,.03) !important;
+      }
+      
+      .table-head h3 {
+        margin: 0 !important;
+        font-size: 16px !important;
+        color: #DEF4F2 !important;
+        font-weight: 600 !important;
+      }
+      
+      .table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 14px !important;
+        background: transparent !important;
+      }
+      
+      .table th, .table td {
+        padding: 12px !important;
+        border-bottom: 1px solid rgba(255,255,255,.1) !important;
+        text-align: right !important;
+        color: #ECF5F3 !important;
+      }
+      
+      .table th {
+        color: #B9C8C6 !important;
+        font-weight: 700 !important;
+        background: rgba(255,255,255,.05) !important;
+      }
+      
+      .table th:first-child, .table td:first-child {
+        text-align: left !important;
+      }
+      
+      .table tr:hover {
+        background: rgba(168,254,238,.08) !important;
+      }
+      
+      /* Ensure proper page breaks */
+      .table-card {
+        page-break-before: always !important;
+      }
+      
+      /* Hide any potential scrollbars */
+      * {
+        overflow: visible !important;
       }
     }
   </style>
@@ -568,7 +742,40 @@
 
     /* ---------- PDF GENEREERIMINE ---------- */
     document.getElementById('pdf-btn').addEventListener('click', () => {
-      window.print();
+      // Set print date for the PDF header
+      const now = new Date();
+      const printDate = now.toLocaleDateString('et-EE', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      document.body.setAttribute('data-print-date', printDate);
+      
+      // Ensure all charts are properly rendered before printing
+      if (chartAssetsPool) {
+        chartAssetsPool.resize();
+        chartAssetsPool.update('none');
+      }
+      if (chartInterest) {
+        chartInterest.resize();
+        chartInterest.update('none');
+      }
+      if (chartCashflow) {
+        chartCashflow.resize();
+        chartCashflow.update('none');
+      }
+      if (chartCost) {
+        chartCost.resize();
+        chartCost.update('none');
+      }
+      
+      // Small delay to ensure charts are fully rendered
+      setTimeout(() => {
+        // Trigger print dialog
+        window.print();
+      }, 200);
     });
 
     /* ---------- MODAL LOOGIKA ---------- */

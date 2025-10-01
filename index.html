@@ -946,6 +946,14 @@
       pdfBtn.disabled = true;
       
       try {
+        // Verify libraries are loaded
+        if (typeof html2canvas === 'undefined') {
+          throw new Error('html2canvas teek ei ole laaditud. Palun laadi lehekülg uuesti.');
+        }
+        if (typeof window.jspdf === 'undefined' && typeof jsPDF === 'undefined') {
+          throw new Error('jsPDF teek ei ole laaditud. Palun laadi lehekülg uuesti.');
+        }
+        
         // Check if charts exist
         if (!chartAssetsPool || !chartInterest || !chartCashflow || !chartCost) {
           alert('Palun lae esmalt Exceli fail!');
@@ -954,7 +962,16 @@
           return;
         }
         
+        // Close modal if open
+        if (modalEl.classList.contains('show')) {
+          closeChartModal();
+        }
+        
+        // Scroll to top to ensure full capture
+        window.scrollTo(0, 0);
+        
         // Ensure all charts are properly rendered
+        console.log('Updating charts before capture...');
         chartAssetsPool.resize();
         chartAssetsPool.update('none');
         chartInterest.resize();
@@ -964,74 +981,111 @@
         chartCost.resize();
         chartCost.update('none');
         
-        // Wait a bit for charts to stabilize
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for charts to stabilize
+        await new Promise(resolve => setTimeout(resolve, 300));
         
-        // Generate PDF using html2canvas and jsPDF on the current visible content
+        // Get the main content
         const mainContent = document.querySelector('.wrap');
         if (!mainContent) {
-          throw new Error('Main content not found');
+          throw new Error('Põhisisu ei leitud (.wrap element puudub)');
         }
         
-        // Close modal if open
-        if (modalEl.classList.contains('show')) {
-          closeChartModal();
-        }
+        console.log('Starting html2canvas capture...');
         
-        // Capture the current page
+        // Capture the current page with better settings
         const canvas = await html2canvas(mainContent, {
           backgroundColor: '#012B32',
-          scale: 1.5,
+          scale: 2, // Higher quality
           useCORS: true,
           allowTaint: true,
-          logging: false,
-          windowWidth: 1200,
-          windowHeight: document.body.scrollHeight
+          logging: true, // Enable logging to see what's happening
+          windowWidth: mainContent.scrollWidth,
+          windowHeight: mainContent.scrollHeight,
+          onclone: (clonedDoc) => {
+            // Ensure cloned document has proper styling
+            const clonedWrap = clonedDoc.querySelector('.wrap');
+            if (clonedWrap) {
+              clonedWrap.style.maxWidth = '1200px';
+              clonedWrap.style.margin = '0 auto';
+            }
+          }
         });
         
+        console.log('Canvas captured, size:', canvas.width, 'x', canvas.height);
+        
+        if (!canvas || canvas.width === 0 || canvas.height === 0) {
+          throw new Error('Canvas jäädvustamine ebaõnnestus - tühi canvas');
+        }
+        
+        // Convert to image
         const imgData = canvas.toDataURL('image/png');
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({
+        if (!imgData || imgData === 'data:,') {
+          throw new Error('Pildi genereerimine ebaõnnestus');
+        }
+        
+        console.log('Image data created, creating PDF...');
+        
+        // Create PDF - try both ways to access jsPDF
+        let jsPDFConstructor;
+        if (typeof window.jspdf !== 'undefined' && window.jspdf.jsPDF) {
+          jsPDFConstructor = window.jspdf.jsPDF;
+        } else if (typeof jsPDF !== 'undefined') {
+          jsPDFConstructor = jsPDF;
+        } else {
+          throw new Error('jsPDF konstruktor ei leitud');
+        }
+        
+        const pdf = new jsPDFConstructor({
           orientation: 'landscape',
           unit: 'mm',
-          format: 'a4'
+          format: 'a4',
+          compress: true
         });
         
         // Calculate dimensions to fit the image on the page
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgWidth = pdfWidth - 20; // 10mm margin on each side
+        const margin = 10;
+        const imgWidth = pdfWidth - (margin * 2);
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
         
-        // If content is taller than one page, we might need multiple pages
+        console.log('PDF dimensions:', pdfWidth, 'x', pdfHeight);
+        console.log('Image dimensions:', imgWidth, 'x', imgHeight);
+        
+        // Add image to PDF
         let heightLeft = imgHeight;
-        let position = 10; // 10mm top margin
+        let position = margin;
         
         // Add the first page
-        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-        heightLeft -= (pdfHeight - 20);
+        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+        heightLeft -= (pdfHeight - margin * 2);
         
         // Add additional pages if needed
         while (heightLeft > 0) {
-          position = heightLeft - imgHeight + 10;
+          position = heightLeft - imgHeight + margin;
           pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-          heightLeft -= (pdfHeight - 20);
+          pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+          heightLeft -= (pdfHeight - margin * 2);
         }
         
         // Generate filename with current date
         const now = new Date();
-        const dateStr = now.toLocaleDateString('et-EE').replace(/\./g, '-');
-        const timeStr = now.toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' }).replace(':', '-');
+        const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '-');
+        const timeStr = now.toTimeString().slice(0, 5).replace(':', '-');
         const filename = `Investor-Portal-Dashboard_${dateStr}_${timeStr}.pdf`;
+        
+        console.log('Saving PDF as:', filename);
         
         // Save the PDF
         pdf.save(filename);
         
+        console.log('PDF saved successfully!');
+        alert('PDF genereerimine õnnestus!');
+        
       } catch (error) {
         console.error('PDF genereerimise viga:', error);
-        console.error('Error details:', error.message, error.stack);
-        alert('PDF genereerimisel tekkis viga. Palun proovi uuesti.\n\nVea detailid: ' + error.message);
+        console.error('Error stack:', error.stack);
+        alert('PDF genereerimisel tekkis viga:\n\n' + error.message + '\n\nVaata konsool (F12) täpsema info jaoks.');
       } finally {
         pdfBtn.textContent = originalText;
         pdfBtn.disabled = false;

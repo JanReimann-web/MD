@@ -946,45 +946,47 @@
       pdfBtn.disabled = true;
       
       try {
+        // Check if charts exist
+        if (!chartAssetsPool || !chartInterest || !chartCashflow || !chartCost) {
+          alert('Palun lae esmalt Exceli fail!');
+          pdfBtn.textContent = originalText;
+          pdfBtn.disabled = false;
+          return;
+        }
+        
         // Ensure all charts are properly rendered
-        if (chartAssetsPool) {
-          chartAssetsPool.resize();
-          chartAssetsPool.update('none');
-        }
-        if (chartInterest) {
-          chartInterest.resize();
-          chartInterest.update('none');
-        }
-        if (chartCashflow) {
-          chartCashflow.resize();
-          chartCashflow.update('none');
-        }
-        if (chartCost) {
-          chartCost.resize();
-          chartCost.update('none');
+        chartAssetsPool.resize();
+        chartAssetsPool.update('none');
+        chartInterest.resize();
+        chartInterest.update('none');
+        chartCashflow.resize();
+        chartCashflow.update('none');
+        chartCost.resize();
+        chartCost.update('none');
+        
+        // Wait a bit for charts to stabilize
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Generate PDF using html2canvas and jsPDF on the current visible content
+        const mainContent = document.querySelector('.wrap');
+        if (!mainContent) {
+          throw new Error('Main content not found');
         }
         
-        // Create a temporary container for PDF export
-        const originalBody = document.body;
-        const pdfContainer = document.createElement('div');
-        pdfContainer.className = 'pdf-export-mode';
-        pdfContainer.innerHTML = originalBody.innerHTML;
+        // Close modal if open
+        if (modalEl.classList.contains('show')) {
+          closeChartModal();
+        }
         
-        // Hide original content and show PDF container
-        originalBody.style.display = 'none';
-        document.documentElement.appendChild(pdfContainer);
-        
-        // Wait for charts to render
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Generate PDF using html2canvas and jsPDF
-        const canvas = await html2canvas(pdfContainer, {
+        // Capture the current page
+        const canvas = await html2canvas(mainContent, {
           backgroundColor: '#012B32',
-          scale: 2,
+          scale: 1.5,
           useCORS: true,
           allowTaint: true,
-          width: 1400,
-          height: 900
+          logging: false,
+          windowWidth: 1200,
+          windowHeight: document.body.scrollHeight
         });
         
         const imgData = canvas.toDataURL('image/png');
@@ -995,14 +997,27 @@
           format: 'a4'
         });
         
-        // Calculate dimensions to fit the image on one page
+        // Calculate dimensions to fit the image on the page
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgWidth = pdfWidth;
-        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+        const imgWidth = pdfWidth - 20; // 10mm margin on each side
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
         
-        // Add the image to PDF
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        // If content is taller than one page, we might need multiple pages
+        let heightLeft = imgHeight;
+        let position = 10; // 10mm top margin
+        
+        // Add the first page
+        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+        heightLeft -= (pdfHeight - 20);
+        
+        // Add additional pages if needed
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight + 10;
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+          heightLeft -= (pdfHeight - 20);
+        }
         
         // Generate filename with current date
         const now = new Date();
@@ -1013,13 +1028,10 @@
         // Save the PDF
         pdf.save(filename);
         
-        // Clean up
-        document.documentElement.removeChild(pdfContainer);
-        originalBody.style.display = '';
-        
       } catch (error) {
         console.error('PDF genereerimise viga:', error);
-        alert('PDF genereerimisel tekkis viga. Palun proovi uuesti.');
+        console.error('Error details:', error.message, error.stack);
+        alert('PDF genereerimisel tekkis viga. Palun proovi uuesti.\n\nVea detailid: ' + error.message);
       } finally {
         pdfBtn.textContent = originalText;
         pdfBtn.disabled = false;
